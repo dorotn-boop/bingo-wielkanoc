@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Wielkanocny Floor</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: system-ui, sans-serif; background: #1a1a2e; color: #fff; min-height: 100vh; overflow-x: hidden; }
+
+  /* EKRAN STARTOWY */
+  #screen-start { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 2rem; text-align: center; }
+  .logo { font-size: 56px; margin-bottom: 0.5rem; }
+  .game-title { font-size: 28px; font-weight: 700; color: #FFD700; margin-bottom: 0.25rem; letter-spacing: 0.05em; }
+  .game-sub { font-size: 15px; color: #aaa; margin-bottom: 2rem; }
+  .start-btn { background: #1D9E75; color: #fff; border: none; border-radius: 14px; padding: 18px 48px; font-size: 20px; font-weight: 700; cursor: pointer; width: 100%; max-width: 320px; }
+  .rules { background: rgba(255,255,255,0.07); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; text-align: left; max-width: 380px; width: 100%; }
+  .rules h3 { font-size: 14px; color: #FFD700; margin-bottom: 0.75rem; }
+  .rules li { font-size: 13px; color: #ccc; margin-bottom: 6px; line-height: 1.5; list-style: none; padding-left: 1.25rem; position: relative; }
+  .rules li::before { content: "→"; position: absolute; left: 0; color: #1D9E75; }
+
+  /* PLANSZA */
+  #screen-game { display: none; min-height: 100vh; flex-direction: column; }
+  .game-header { background: #16213e; padding: 12px 16px; display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 10; }
+  .round-badge { background: #FFD700; color: #1a1a2e; border-radius: 8px; padding: 4px 12px; font-size: 12px; font-weight: 700; }
+  .score-info { font-size: 13px; color: #aaa; flex: 1; }
+  .lives { font-size: 18px; letter-spacing: 2px; }
+
+  .floor-wrap { padding: 12px; flex: 1; }
+  .floor-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-bottom: 12px; }
+  .floor-cell { aspect-ratio: 1; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; text-align: center; line-height: 1.2; padding: 4px; cursor: pointer; transition: transform 0.15s, opacity 0.3s; border: 2px solid transparent; position: relative; overflow: hidden; }
+  .floor-cell.active { background: #2d5a8e; border-color: #4a90d9; color: #fff; }
+  .floor-cell.active:hover { transform: scale(1.05); }
+  .floor-cell.selected { background: #FFD700; border-color: #FFA500; color: #1a1a2e; }
+  .floor-cell.correct { background: #1D9E75; border-color: #0F6E56; color: #fff; animation: pop 0.4s ease; }
+  .floor-cell.wrong { background: #c0392b; border-color: #922b21; color: #fff; animation: shake 0.4s ease; }
+  .floor-cell.eliminated { background: #111; border-color: #333; color: #444; opacity: 0.5; cursor: default; }
+  .floor-cell.free { background: #2ecc71; border-color: #27ae60; color: #fff; cursor: default; }
+
+  @keyframes pop { 0%{transform:scale(1)} 50%{transform:scale(1.15)} 100%{transform:scale(1)} }
+  @keyframes shake { 0%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} 100%{transform:translateX(0)} }
+
+  /* PYTANIE */
+  .question-box { background: #16213e; border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+  .q-category { font-size: 11px; color: #FFD700; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+  .q-text { font-size: 17px; font-weight: 600; line-height: 1.4; color: #fff; margin-bottom: 12px; }
+  .q-image { width: 100%; max-height: 160px; object-fit: cover; border-radius: 10px; margin-bottom: 12px; display: none; }
+  .answers { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .answer-btn { background: rgba(255,255,255,0.08); border: 1.5px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 12px 8px; font-size: 14px; font-weight: 500; color: #fff; cursor: pointer; text-align: center; transition: background 0.15s; }
+  .answer-btn:active { transform: scale(0.97); }
+  .answer-btn.correct-ans { background: #1D9E75; border-color: #0F6E56; }
+  .answer-btn.wrong-ans { background: #c0392b; border-color: #922b21; }
+  .answer-btn:disabled { opacity: 0.6; cursor: default; }
+
+  /* WYNIK PYTANIA */
+  .result-msg { text-align: center; padding: 10px; font-size: 16px; font-weight: 700; border-radius: 10px; margin-bottom: 10px; display: none; }
+  .result-msg.win { background: #1D9E75; }
+  .result-msg.lose { background: #c0392b; }
+  .next-btn { width: 100%; background: #FFD700; color: #1a1a2e; border: none; border-radius: 12px; padding: 14px; font-size: 16px; font-weight: 700; cursor: pointer; display: none; }
+
+  /* EKRAN KOŃCOWY */
+  #screen-end { display: none; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 2rem; text-align: center; }
+  .end-icon { font-size: 64px; margin-bottom: 1rem; }
+  .end-title { font-size: 26px; font-weight: 700; color: #FFD700; margin-bottom: 0.5rem; }
+  .end-score { font-size: 18px; color: #ccc; margin-bottom: 2rem; }
+  .restart-btn { background: #1D9E75; color: #fff; border: none; border-radius: 14px; padding: 16px 40px; font-size: 18px; font-weight: 700; cursor: pointer; }
+
+  /* MODAL GRACZA */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 100; display: none; align-items: center; justify-content: center; padding: 1.5rem; }
+  .modal-overlay.show { display: flex; }
+  .modal { background: #16213e; border-radius: 16px; padding: 1.5rem; width: 100%; max-width: 340px; text-align: center; }
+  .modal h3 { font-size: 18px; font-weight: 700; color: #FFD700; margin-bottom: 0.75rem; }
+  .modal p { font-size: 14px; color: #ccc; margin-bottom: 1.25rem; line-height: 1.5; }
+  .modal input { width: 100%; background: rgba(255,255,255,0.1); border: 1.5px solid rgba(255,255,255,0.2); border-radius: 10px; padding: 12px; font-size: 16px; color: #fff; text-align: center; margin-bottom: 1rem; }
+  .modal-btn { background: #1D9E75; color: #fff; border: none; border-radius: 10px; padding: 12px 32px; font-size: 16px; font-weight: 700; cursor: pointer; width: 100%; }
+</style>
+</head>
+<body>
+
+<!-- START -->
+<div id="screen-start">
+  <div class="logo">🐣</div>
+  <div class="game-title">THE FLOOR</div>
+  <div class="game-sub">Wielkanocna edycja</div>
+  <ul class="rules">
+    <h3>Jak grać?</h3>
+    <li>Plansza ma 25 pól — każde to inny gracz lub wolne miejsce</li>
+    <li>Prowadzący wybiera pole i zadaje pytanie temu graczowi</li>
+    <li>Dobra odpowiedź — gracz zostaje, złe — odpada</li>
+    <li>Ostatni gracz na planszy wygrywa!</li>
+    <li>Możesz grać też drużynowo — każde pole to drużyna</li>
+  </ul>
+  <button class="start-btn" onclick="startSetup()">Zaczynamy! 🐰</button>
+</div>
+
+<!-- MODAL SETUP GRACZY -->
+<div class="modal-overlay" id="modal-players">
+  <div class="modal">
+    <h3>👥 Dodaj graczy</h3>
+    <p>Wpisz imię gracza i przypisz go do pola na planszy. Możesz dodać max 24 graczy (1 pole FREE w środku).</p>
+    <input type="text" id="player-input" placeholder="Imię gracza..." maxlength="12">
+    <button class="modal-btn" onclick="addPlayer()">Dodaj do planszy ✓</button>
+    <div style="margin-top:12px;">
+      <button style="background:transparent;border:none;color:#FFD700;font-size:14px;cursor:pointer;" onclick="startGame()">Gotowe — startujemy! →</button>
+    </div>
+    <div id="player-count" style="font-size:12px;color:#aaa;margin-top:8px;">0 / 24 graczy dodanych</div>
+  </div>
+</div>
+
+<!-- MODAL PYTANIE DLA GRACZA -->
+<div class="modal-overlay" id="modal-question">
+  <div class="modal" style="max-width:400px;">
+    <div class="q-category" id="mq-cat"></div>
+    <div class="q-text" id="mq-text" style="font-size:16px;margin-bottom:14px;text-align:left;"></div>
+    <div class="answers" id="mq-answers"></div>
+    <div class="result-msg" id="mq-result"></div>
+    <button class="next-btn" id="mq-next" onclick="closeQuestion()">Dalej →</button>
+  </div>
+</div>
+
+<!-- GAME -->
+<div id="screen-game">
+  <div class="game-header">
+    <span class="round-badge" id="round-num">Runda 1</span>
+    <span class="score-info" id="active-count">25 pól aktywnych</span>
+    <span class="lives" id="lives-display"></span>
+  </div>
+  <div class="floor-wrap">
+    <div class="floor-grid" id="floor-grid"></div>
+    <div style="background:#16213e;border-radius:14px;padding:14px;text-align:center;">
+      <p style="font-size:13px;color:#aaa;margin-bottom:10px;">Dotknij pole na planszy, żeby zadać pytanie temu graczowi</p>
+      <button onclick="drawRandom()" style="background:rgba(255,215,0,0.15);border:1.5px solid #FFD700;color:#FFD700;border-radius:10px;padding:10px 20px;font-size:14px;font-weight:600;cursor:pointer;">🎲 Losuj pole</button>
+    </div>
+  </div>
+</div>
+
+<!-- END -->
+<div id="screen-end">
+  <div class="end-icon">🏆</div>
+  <div class="end-title" id="end-title">Mamy zwycięzcę!</div>
+  <div class="end-score" id="end-winner"></div>
+  <div style="margin-bottom:2rem;font-size:13px;color:#aaa;" id="end-stats"></div>
+  <button class="restart-btn" onclick="location.reload()">Zagraj jeszcze raz 🐣</button>
+</div>
+
+<script>
+const QUESTIONS = [
+  // TRADYCJE WIELKANOCNE
+  {cat:"Tradycje", q:"Co święci się w koszyczku wielkanocnym w Wielką Sobotę?", a:["Jajka, chleb, kiełbasa, sól", "Tylko pisanki", "Ryby i wino", "Kwiaty i świece"], correct:0},
+  {cat:"Tradycje", q:"Jak nazywa się zwyczaj oblewania wodą w lany poniedziałek?", a:["Śmigus-dyngus", "Rezurekcja", "Kulig", "Kolędowanie"], correct:0},
+  {cat:"Tradycje", q:"W którym dniu Wielkiego Tygodnia odbywa się procesja rezurekcyjna?", a:["Niedziela Wielkanocna", "Wielka Sobota", "Wielki Piątek", "Wielki Czwartek"], correct:0},
+  {cat:"Tradycje", q:"Jak nazywa się niedziela przed Wielkanocą, gdy święci się palmy?", a:["Niedziela Palmowa", "Niedziela Różańcowa", "Niedziela Dobrego Pasterza", "Niedziela Wielkanocna"], correct:0},
+  {cat:"Tradycje", q:"Co symbolizuje pisanka?", a:["Nowe życie i odrodzenie", "Śmierć i żałobę", "Bogactwo i dobrobyt", "Podróż i przygodę"], correct:0},
+  {cat:"Tradycje", q:"Jak nazywa się tradycyjny wielkanocny żurek z jajkiem i kiełbasą?", a:["Żurek staropolski", "Barszcz wielkanocny", "Zupa wielkopostna", "Rosół świąteczny"], correct:0},
+  {cat:"Tradycje", q:"Co to jest baranek wielkanocny z cukru lub masła?", a:["Symbol Chrystusa Zmartwychwstałego", "Ozdoba bez znaczenia", "Symbol wiosny", "Pamiątka z podróży"], correct:0},
+  {cat:"Tradycje", q:"Kiedy tradycyjnie śpiewa się \"Alleluja\"?", a:["W Niedzielę Wielkanocną", "W Wielki Piątek", "W Środę Popielcową", "W Boże Narodzenie"], correct:0},
+
+  // BIBLIA I RELIGIA
+  {cat:"Biblia", q:"Ile dni po ukrzyżowaniu Jezus zmartwychwstał?", a:["Trzeciego dnia", "Siódmego dnia", "Czterdziestego dnia", "Pierwszego dnia"], correct:0},
+  {cat:"Biblia", q:"Kto pierwsza odkryła pusty grób?", a:["Maria Magdalena", "Maryja — Matka Jezusa", "Marta z Betanii", "Salome"], correct:0},
+  {cat:"Biblia", q:"Za ile srebrników Judasz zdradził Jezusa?", a:["30", "10", "50", "100"], correct:0},
+  {cat:"Biblia", q:"Jak miał na imię apostoł, który nie uwierzył w zmartwychwstanie bez dotknięcia ran?", a:["Tomasz", "Piotr", "Jan", "Jakub"], correct:0},
+  {cat:"Biblia", q:"Na jakim wzgórzu ukrzyżowano Jezusa?", a:["Golgota", "Synaj", "Oliwna", "Karmel"], correct:0},
+  {cat:"Biblia", q:"Kto skazał Jezusa na śmierć?", a:["Poncjusz Piłat", "Herod Wielki", "Kajfasz", "Król Dawid"], correct:0},
+  {cat:"Biblia", q:"Co oznacza słowo \"Pascha\"?", a:["Przejście", "Zmartwychwstanie", "Ofiara", "Radość"], correct:0},
+  {cat:"Biblia", q:"Ilu apostołów było razem z Jezusem podczas Ostatniej Wieczerzy?", a:["12", "7", "3", "70"], correct:0},
+  {cat:"Biblia", q:"Co Jezus robił uczniom podczas Ostatniej Wieczerzy, co stało się tradycją?", a:["Umywał nogi", "Śpiewał psalmy", "Dzielił się winem tylko", "Błogosławił dzieci"], correct:0},
+  {cat:"Biblia", q:"Na jakim zwierzęciu Jezus wjechał do Jerozolimy w Niedzielę Palmową?", a:["Osiołku", "Koniu", "Wielbłądzie", "Pieszo"], correct:0},
+
+  // PRZYRODA I WIOSNA
+  {cat:"Przyroda", q:"Które drzewo jako pierwsze kwitnie wiosną w Polsce?", a:["Forsycja", "Jabłoń", "Wiśnia", "Lipa"], correct:0},
+  {cat:"Przyroda", q:"Jak nazywają się puchate kwiaty wierzby symbolizujące wiosnę?", a:["Bazie (kotki)", "Pąki", "Kłosy", "Szyszki"], correct:0},
+  {cat:"Przyroda", q:"Ile dni trwa okres lęgowy u kury?", a:["21 dni", "7 dni", "14 dni", "30 dni"], correct:0},
+  {cat:"Przyroda", q:"Który ptak kojarzy się z Wielkanocą i wiosennym przebudzeniem?", a:["Bocian", "Kruk", "Sowa", "Pingwin"], correct:0},
+  {cat:"Przyroda", q:"Jaki kwiat jest symbolem wiosny i Wielkanocy — żółty, pierwszy kwitnie?", a:["Narcyz", "Tulipan", "Róża", "Słonecznik"], correct:0},
+  {cat:"Przyroda", q:"Ile nóg ma pszczoła?", a:["6", "4", "8", "12"], correct:0},
+
+  // HISTORIA I CIEKAWOSTKI
+  {cat:"Ciekawostki", q:"W którym kraju powstał zwyczaj ukrywania pisanek przez zajączka?", a:["Niemcy", "Polska", "Francja", "Anglia"], correct:0},
+  {cat:"Ciekawostki", q:"Jak nazywa się 40-dniowy post przed Wielkanocą?", a:["Wielki Post", "Adwent", "Oktawa", "Nowenna"], correct:0},
+  {cat:"Ciekawostki", q:"Co symbolizuje świeca paschalna (Paschał)?", a:["Zmartwychwstałego Chrystusa", "Ogień piekielny", "Ducha Świętego", "Maryję"], correct:0},
+  {cat:"Ciekawostki", q:"Jakie litery są wypisane na Paschale?", a:["Alfa i Omega", "INRI", "IHS", "PAX"], correct:0},
+  {cat:"Ciekawostki", q:"Co oznacza symbol ryby (Ichthys) w chrześcijaństwie?", a:["Jezus Chrystus Syn Boży Zbawiciel", "Rybacy z Galilei", "Cud rozmnożenia chleba", "Chrzest w Jordanie"], correct:0},
+  {cat:"Ciekawostki", q:"Ile stacji ma Droga Krzyżowa?", a:["14", "7", "12", "10"], correct:0},
+  {cat:"Ciekawostki", q:"Co to jest Triduum Paschalne?", a:["Trzy dni: Wielki Czwartek, Piątek, Sobota", "Trzy tygodnie postu", "Trzy modlitwy wielkanocne", "Trzy msze wielkanocne"], correct:0},
+  {cat:"Ciekawostki", q:"Skąd pochodzi słowo \"Wielkanoc\"?", a:["Wielka Noc — noc zmartwychwstania", "Wielka Radość nocy", "Wielki Post nocny", "Wielka modlitwa nocna"], correct:0},
+  {cat:"Ciekawostki", q:"Czym mazurek różni się od zwykłego ciasta?", a:["Jest płaski, bez zaczynu drożdżowego", "Ma więcej jajek", "Jest zawsze czekoladowy", "Piecze się go bez formy"], correct:0},
+];
+
+let players = [];
+let cells = [];
+let round = 1;
+let currentCellIdx = null;
+let currentQ = null;
+let usedQuestions = [];
+
+function startSetup() {
+  document.getElementById('screen-start').style.display = 'none';
+  document.getElementById('modal-players').classList.add('show');
+}
+
+function addPlayer() {
+  const input = document.getElementById('player-input');
+  const name = input.value.trim();
+  if (!name || players.length >= 24) return;
+  players.push(name);
+  input.value = '';
+  input.focus();
+  document.getElementById('player-count').textContent = `${players.length} / 24 graczy dodanych`;
+}
+
+document.getElementById('player-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') addPlayer();
+});
+
+function startGame() {
+  if (players.length < 2) { alert('Dodaj co najmniej 2 graczy!'); return; }
+  document.getElementById('modal-players').classList.remove('show');
+  document.getElementById('screen-game').style.display = 'flex';
+  buildFloor();
+}
+
+function buildFloor() {
+  const grid = document.getElementById('floor-grid');
+  grid.innerHTML = '';
+  cells = [];
+  const shuffledPlayers = [...players].sort(() => Math.random() - 0.5);
+  for (let i = 0; i < 25; i++) {
+    const isFree = i === 12;
+    const player = isFree ? null : shuffledPlayers[i < 12 ? i : i - 1] || null;
+    const cell = {
+      idx: i, name: isFree ? 'FREE' : (player || `Gracz ${i+1}`),
+      state: isFree ? 'free' : 'active'
+    };
+    cells.push(cell);
+    const el = document.createElement('div');
+    el.className = `floor-cell ${cell.state}`;
+    el.textContent = cell.name;
+    el.dataset.idx = i;
+    if (!isFree) el.addEventListener('click', () => selectCell(i));
+    grid.appendChild(el);
+  }
+  updateHeader();
+}
+
+function selectCell(idx) {
+  if (cells[idx].state !== 'active') return;
+  currentCellIdx = idx;
+  document.querySelectorAll('.floor-cell').forEach(el => el.classList.remove('selected'));
+  document.querySelector(`[data-idx="${idx}"]`).classList.add('selected');
+  showQuestion(idx);
+}
+
+function drawRandom() {
+  const active = cells.filter(c => c.state === 'active');
+  if (active.length === 0) return;
+  const pick = active[Math.floor(Math.random() * active.length)];
+  selectCell(pick.idx);
+}
+
+function getQuestion() {
+  const available = QUESTIONS.filter((_, i) => !usedQuestions.includes(i));
+  if (available.length === 0) { usedQuestions = []; return getQuestion(); }
+  const origIdx = QUESTIONS.indexOf(available[Math.floor(Math.random() * available.length)]);
+  usedQuestions.push(origIdx);
+  return QUESTIONS[origIdx];
+}
+
+function showQuestion(cellIdx) {
+  currentQ = getQuestion();
+  const player = cells[cellIdx].name;
+  document.getElementById('mq-cat').textContent = `${currentQ.cat} — pytanie dla: ${player}`;
+  document.getElementById('mq-text').textContent = currentQ.q;
+
+  const answersEl = document.getElementById('mq-answers');
+  answersEl.innerHTML = '';
+  currentQ.a.forEach((ans, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'answer-btn';
+    btn.textContent = ans;
+    btn.onclick = () => checkAnswer(i, btn);
+    answersEl.appendChild(btn);
+  });
+
+  document.getElementById('mq-result').style.display = 'none';
+  document.getElementById('mq-next').style.display = 'none';
+  document.getElementById('modal-question').classList.add('show');
+}
+
+function checkAnswer(chosen, btn) {
+  document.querySelectorAll('.answer-btn').forEach(b => b.disabled = true);
+  const resultEl = document.getElementById('mq-result');
+  const nextBtn = document.getElementById('mq-next');
+  const correct = currentQ.correct;
+
+  document.querySelectorAll('.answer-btn')[correct].classList.add('correct-ans');
+
+  if (chosen === correct) {
+    btn.classList.add('correct-ans');
+    resultEl.textContent = `✓ Brawo ${cells[currentCellIdx].name}! Zostaje na planszy!`;
+    resultEl.className = 'result-msg win';
+    resultEl.style.display = 'block';
+    document.querySelector(`[data-idx="${currentCellIdx}"]`).classList.remove('selected');
+    document.querySelector(`[data-idx="${currentCellIdx}"]`).classList.add('correct');
+    setTimeout(() => {
+      document.querySelector(`[data-idx="${currentCellIdx}"]`).classList.remove('correct');
+      document.querySelector(`[data-idx="${currentCellIdx}"]`).classList.add('active');
+    }, 800);
+  } else {
+    btn.classList.add('wrong-ans');
+    resultEl.textContent = `✗ Niestety! ${cells[currentCellIdx].name} odpada!`;
+    resultEl.className = 'result-msg lose';
+    resultEl.style.display = 'block';
+    cells[currentCellIdx].state = 'eliminated';
+  }
+  nextBtn.style.display = 'block';
+}
+
+function closeQuestion() {
+  document.getElementById('modal-question').classList.remove('show');
+  document.querySelectorAll('.floor-cell').forEach(el => el.classList.remove('selected'));
+  updateFloor();
+  updateHeader();
+  round++;
+  checkWinner();
+}
+
+function updateFloor() {
+  cells.forEach((cell, i) => {
+    const el = document.querySelector(`[data-idx="${i}"]`);
+    if (!el) return;
+    el.className = `floor-cell ${cell.state}`;
+    el.textContent = cell.name;
+    if (cell.state === 'active') el.onclick = () => selectCell(i);
+    else el.onclick = null;
+  });
+}
+
+function updateHeader() {
+  const active = cells.filter(c => c.state === 'active').length;
+  document.getElementById('round-num').textContent = `Runda ${round}`;
+  document.getElementById('active-count').textContent = `${active} graczy aktywnych`;
+}
+
+function checkWinner() {
+  const active = cells.filter(c => c.state === 'active');
+  if (active.length === 1) {
+    setTimeout(() => {
+      document.getElementById('screen-game').style.display = 'none';
+      document.getElementById('screen-end').style.display = 'flex';
+      document.getElementById('end-title').textContent = '🏆 Mamy zwycięzcę!';
+      document.getElementById('end-winner').textContent = active[0].name;
+      document.getElementById('end-stats').textContent = `Gra trwała ${round - 1} rund`;
+    }, 500);
+  }
+}
+</script>
+</body>
+</html>
